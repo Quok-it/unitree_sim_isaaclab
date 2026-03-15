@@ -8,7 +8,7 @@ support different robot variants: with/without waist joint, different finger con
 
 from isaaclab.assets import ArticulationCfg
 from isaaclab.utils import configclass
-from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX,G129_CFG_WITH_INSPIRE_HAND,G129_CFG_WITH_DEX1_WHOLEBODY,G129_CFG_WITH_DEX3_WHOLEBODY,G129_CFG_WITH_INSPIRE_WHOLEBODY,H12_CFG_WITH_INSPIRE_HAND
+from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX,G129_CFG_WITH_INSPIRE_HAND,G129_CFG_WITH_DEX1_WHOLEBODY,G129_CFG_WITH_DEX3_WHOLEBODY,G129_CFG_WITH_INSPIRE_WHOLEBODY,H12_CFG_WITH_INSPIRE_HAND,G129_CFG_WITH_BRAINCO_HAND
 from typing import Optional, Dict, Tuple, Literal
 
 
@@ -83,7 +83,7 @@ class RobotJointTemplates:
         }
     
     @classmethod
-    def get_hand_joints(cls, hand_type: Literal["gripper", "dex3","inspire"] = "gripper") -> Dict[str, float]:
+    def get_hand_joints(cls, hand_type: Literal["gripper", "dex3", "inspire", "brainco"] = "gripper") -> Dict[str, float]:
         """get the default position of the hand joints
         
         Args:
@@ -151,8 +151,26 @@ class RobotJointTemplates:
             "R_thumb_intermediate_joint":0.0,
             "R_thumb_distal_joint":0.0,
             }
+        elif hand_type == "brainco":
+            return {
+                # BrainCo Revo 2 - left hand (6 actuated joints)
+                "left_thumb_metacarpal_joint": 0.0,
+                "left_thumb_proximal_joint": 0.0,
+                "left_index_proximal_joint": 0.0,
+                "left_middle_proximal_joint": 0.0,
+                "left_ring_proximal_joint": 0.0,
+                "left_pinky_proximal_joint": 0.0,
+
+                # BrainCo Revo 2 - right hand (6 actuated joints)
+                "right_thumb_metacarpal_joint": 0.0,
+                "right_thumb_proximal_joint": 0.0,
+                "right_index_proximal_joint": 0.0,
+                "right_middle_proximal_joint": 0.0,
+                "right_ring_proximal_joint": 0.0,
+                "right_pinky_proximal_joint": 0.0,
+            }
         else:
-            raise ValueError(f"Unsupported hand type: {hand_type}. Supported: 'gripper', 'dex3'")
+            raise ValueError(f"Unsupported hand type: {hand_type}. Supported: 'gripper', 'dex3', 'inspire', 'brainco'")
 
 
 @configclass
@@ -174,7 +192,7 @@ class RobotBaseCfg:
         init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.744),
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071),
         include_waist: bool = True,
-        hand_type: Literal["gripper", "dex3", "inspire"] = "gripper",
+        hand_type: Literal["gripper", "dex3", "inspire", "brainco"] = "gripper",
         base_config = None,
         custom_joint_pos: Optional[Dict[str, float]] = None,
         is_have_hand: bool = True,
@@ -282,6 +300,18 @@ class G1RobotPresets:
             include_waist=False,
             hand_type="inspire",
             base_config=G129_CFG_WITH_INSPIRE_HAND
+        )
+
+    @classmethod
+    def g1_29dof_brainco_base_fix(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
+        init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
+        """pick-place task configuration - BrainCo Revo 2 hand"""
+        return RobotBaseCfg.get_base_config(
+            init_pos=init_pos,
+            init_rot=init_rot,
+            include_waist=False,
+            hand_type="brainco",
+            base_config=G129_CFG_WITH_BRAINCO_HAND
         )
     @classmethod
     def g1_29dof_dex1_wholebody(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.80),
