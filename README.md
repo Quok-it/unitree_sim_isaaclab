@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"> unitree_sim_isaaclab + n1 robotics</h1>
+  <h1 align="center"> unitree_sim_isaaclab + n1 robotics!</h1>
   <h3 align="center"> Unitree Robotics + Modifications by N1 Robotics </h3>
   <p align="center">
     <a> English </a> | <a href="README_zh-CN.md">中文</a> 
