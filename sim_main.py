@@ -358,9 +358,75 @@ def main():
             exposure=0.8,                
             focus_distance=1.2
         )
+    print(">>> CALLING env.sim.reset() <<<", flush=True)
     env.sim.reset()
+    print(">>> env.sim.reset() DONE <<<", flush=True)
+
+    # PRE-RESET WARMUP: prime the renderer so annotators have real data before
+    # env.reset()'s internal sensor-buffer initialization runs.
+    # Without this, _create_annotator_data() stacks empty tensors from unrendered
+    # annotators, producing a malformed output buffer. The first env.step that
+    # triggers an actual buffer UPDATE then crashes with:
+    #   expand(ByteTensor[480,640,3], size=[0])
+    # Manual launches dodge this because user interaction with the viewport gives
+    # the renderer time to produce frames before env.reset() allocates buffers.
+    try:
+        print(">>> PRE-RESET RENDER WARMUP (30x env.sim.render()) <<<", flush=True)
+        for i in range(30):
+            env.sim.render()
+        print(">>> PRE-RESET RENDER WARMUP DONE <<<", flush=True)
+    except Exception as _pre_e:
+        print(f"[sim] pre-reset render warmup failed (continuing): {_pre_e}", flush=True)
+
+    print(">>> CALLING env.reset() <<<", flush=True)
     env.reset()
-    
+    print(">>> env.reset() DONE <<<", flush=True)
+
+    # POST-RESET BUFFER CLEAR: env.reset may have allocated camera output buffers
+    # while annotators were still empty. Clear those buffers so the next .data
+    # access re-allocates them with now-valid annotator data.
+    try:
+        print(">>> POST-RESET: clearing malformed camera output buffers <<<", flush=True)
+        for sensor_name, sensor in getattr(env.scene, "sensors", {}).items():
+            if "camera" not in sensor_name.lower():
+                continue
+            try:
+                # Clear the output dict so _update_buffers_impl takes the
+                # _create_annotator_data branch again on next access.
+                if hasattr(sensor, "_data") and hasattr(sensor._data, "output"):
+                    existing_shapes = {
+                        k: tuple(v.shape) for k, v in sensor._data.output.items()
+                    }
+                    print(f"[sim]   {sensor_name} current output shapes: {existing_shapes}", flush=True)
+                    sensor._data.output = {}
+                if hasattr(sensor, "_is_outdated"):
+                    sensor._is_outdated[:] = True
+                print(f"[sim]   {sensor_name}: output cleared, marked outdated", flush=True)
+            except Exception as _se:
+                print(f"[sim]   {sensor_name}: clear failed: {_se}", flush=True)
+    except Exception as _clr_e:
+        print(f"[sim] post-reset clear failed (continuing): {_clr_e}", flush=True)
+
+    # Render more after the clear, then access .data to force fresh allocation
+    # while the renderer is definitely producing frames.
+    try:
+        print(">>> POST-RESET RENDER WARMUP (30x env.sim.render()) <<<", flush=True)
+        for i in range(30):
+            env.sim.render()
+        print(">>> POST-RESET RENDER WARMUP DONE — re-allocating camera buffers <<<", flush=True)
+        for sensor_name, sensor in getattr(env.scene, "sensors", {}).items():
+            if "camera" not in sensor_name.lower():
+                continue
+            try:
+                out = sensor.data.output
+                shapes = {k: tuple(v.shape) for k, v in out.items()}
+                print(f"[sim]   {sensor_name}: re-allocated shapes: {shapes}", flush=True)
+            except Exception as _re:
+                print(f"[sim]   {sensor_name}: re-alloc failed: {_re}", flush=True)
+        print(">>> CAMERA BUFFERS RE-ALLOCATED <<<", flush=True)
+    except Exception as _post_e:
+        print(f"[sim] post-reset warmup failed (continuing): {_post_e}", flush=True)
+
     # create simplified control configuration
     try:    
         control_config = ControlConfig(
@@ -442,6 +508,7 @@ def main():
         setup_signal_handlers(controller)
         
     print("Note: The DDS in Sim transmits messages on channel 1. Please ensure that other DDS instances use the same channel for message exchange by setting: ChannelFactoryInitialize(1).")
+
     try:
         # start controller - start asynchronous components
         print("========= start controller =========")
@@ -578,7 +645,11 @@ def main():
         print("\nuser interrupted program")
     
     except Exception as e:
+        import traceback
         print(f"\nprogram exception: {e}")
+        print("=== TRACEBACK ===")
+        traceback.print_exc()
+        print("=== END TRACEBACK ===")
     
     finally:
         # clean up resources
