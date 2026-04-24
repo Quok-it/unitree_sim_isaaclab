@@ -1,4 +1,4 @@
-# sim-scripts
+# sim-scripts!
 
 Shell scripts for launching and managing the Unitree Isaac Lab simulation workflow.
 
