@@ -70,8 +70,21 @@ From this repo root:
 
 ```bash
 chmod +x sim-launcher.sh sim-launcher-teleop.sh run-sim.sh run-teleop.sh
-./sim-launcher.sh start
+./sim-launcher.sh start                # defaults to wholebody
+./sim-launcher.sh start arms           # arms-only (fixed base, Joint task)
+./sim-launcher.sh start wholebody      # explicit
 ```
+
+### Modes
+
+| Mode | Task | Behavior |
+|---|---|---|
+| `wholebody` (default) | `Isaac-Move-Cylinder-G129-Dex3-Wholebody` | Full-body control via `dds_wholebody` action mode |
+| `arms` (alias: `arms-only`) | `Isaac-PickPlace-Cylinder-G129-Dex3-Joint` | Arms-only joint control with fixed base |
+
+You can also pass the mode as a flag: `./sim-launcher.sh start -m arms`.
+
+> **Note:** `restart` with no mode arg falls back to the default (`wholebody`). Pass the mode explicitly (`./sim-launcher.sh restart arms`) to keep arms-only across a restart.
 
 To run the combined workflow instead:
 
@@ -102,12 +115,12 @@ Stop everything:
 ## Command Reference
 
 ```bash
-./sim-launcher.sh start
+./sim-launcher.sh start [arms|wholebody]      # default: wholebody
 ./sim-launcher.sh stop
 ./sim-launcher.sh status
 ./sim-launcher.sh logs
 ./sim-launcher.sh clean
-./sim-launcher.sh restart
+./sim-launcher.sh restart [arms|wholebody]    # default: wholebody (does not remember prior mode)
 ```
 
 ## Environment Variables

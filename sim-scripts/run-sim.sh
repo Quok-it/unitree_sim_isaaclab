@@ -12,6 +12,8 @@ WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets Fa
                                 # shape mismatch because subscribers spin up before any publisher has
                                 # announced on the DDS bus)
 
+SIM_TASK="${SIM_TASK:-Isaac-Move-Cylinder-G129-Dex3-Wholebody}"
+
 if [[ -z "${DISPLAY:-}" ]]; then
     echo "ERROR: DISPLAY is not set. Run this from a graphical session." >&2
     exit 1
@@ -44,7 +46,7 @@ exec $SUDO docker run --gpus all -it --rm --network host \
         python sim_main.py \
             --device cpu \
             --enable_cameras \
-            --task Isaac-PickPlace-Cylinder-G129-Dex3-Joint \
+            --task ${SIM_TASK} \
             --enable_dex3_dds \
             --robot_type g129 \
             --kit_args '--/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false'
