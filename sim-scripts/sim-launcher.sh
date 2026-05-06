@@ -17,7 +17,7 @@ SUDO="${SUDO:-}"
 # into dds_wholebody action mode; "Joint" tasks are arms-only with a fixed base.
 WHOLEBODY_TASK="Isaac-Move-Cylinder-G129-Dex3-Wholebody"
 ARMS_TASK="Isaac-PickPlace-Cylinder-G129-Dex3-Joint"
-DEFAULT_MODE="wholebody"
+DEFAULT_MODE="arms"
 
 mkdir -p "$LOG_DIR"
 

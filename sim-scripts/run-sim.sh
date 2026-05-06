@@ -12,7 +12,7 @@ WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets Fa
                                 # shape mismatch because subscribers spin up before any publisher has
                                 # announced on the DDS bus)
 
-SIM_TASK="${SIM_TASK:-Isaac-Move-Cylinder-G129-Dex3-Wholebody}"
+SIM_TASK="${SIM_TASK:-Isaac-PickPlace-Cylinder-G129-Dex3-Joint}"
 
 if [[ -z "${DISPLAY:-}" ]]; then
     echo "ERROR: DISPLAY is not set. Run this from a graphical session." >&2
@@ -36,6 +36,7 @@ exec $SUDO docker run --gpus all -it --rm --network host \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     -v "$SIM_DIR/assets:/home/code/unitree_sim_isaaclab/assets" \
     -v "$SIM_DIR/sim_main.py:/home/code/unitree_sim_isaaclab/sim_main.py:ro" \
+    -v "$SIM_DIR/action_provider:/home/code/unitree_sim_isaaclab/action_provider:ro" \
     "$DOCKER_IMAGE" \
     /bin/bash -c "
         source /opt/conda/etc/profile.d/conda.sh &&
