@@ -110,7 +110,7 @@ class DDSActionProvider(ActionProvider):
                 "left_hand_index_0_joint":5,
                 "left_hand_index_1_joint":6}
             self.right_hand_joint_mapping = {
-                "right_hand_thumb_0_joint":0,     
+                "right_hand_thumb_0_joint":0,
                 "right_hand_thumb_1_joint":1,
                 "right_hand_thumb_2_joint":2,
                 "right_hand_middle_0_joint":3,
@@ -191,6 +191,14 @@ class DDSActionProvider(ActionProvider):
             self._left_hand_source_indices = [idx for idx in self.left_hand_joint_mapping.values()]
             self._right_hand_target_indices = [self.joint_to_index[name] for name in self.right_hand_joint_mapping.keys()]
             self._right_hand_source_indices = [idx for idx in self.right_hand_joint_mapping.values()]
+            print("[DEX3 DIAG] all_joint_names:", list(self.all_joint_names))
+            print("[DEX3 DIAG] left_hand_joint_mapping:", dict(self.left_hand_joint_mapping))
+            print("[DEX3 DIAG] right_hand_joint_mapping:", dict(self.right_hand_joint_mapping))
+            print("[DEX3 DIAG] left_hand_target_indices (positions in articulation):", self._left_hand_target_indices)
+            print("[DEX3 DIAG] right_hand_target_indices (positions in articulation):", self._right_hand_target_indices)
+            print("[DEX3 DIAG] resolved L joints:", [self.all_joint_names[i] for i in self._left_hand_target_indices])
+            print("[DEX3 DIAG] resolved R joints:", [self.all_joint_names[i] for i in self._right_hand_target_indices])
+            self._dex3_apply_log_count = 0
         if self.enable_inspire:
             self._inspire_target_indices = [self.joint_to_index[name] for name in self.inspire_hand_joint_mapping.keys()]
             self._inspire_source_indices = [idx for idx in self.inspire_hand_joint_mapping.values()]
@@ -299,10 +307,44 @@ class DDSActionProvider(ActionProvider):
                         if len(left_positions) >= len(self._left_hand_buf) and len(right_positions) >= len(self._right_hand_buf):
                             self._left_hand_buf.copy_(torch.tensor(left_positions[:len(self._left_hand_buf)], dtype=torch.float32, device=self.env.device))
                             self._right_hand_buf.copy_(torch.tensor(right_positions[:len(self._right_hand_buf)], dtype=torch.float32, device=self.env.device))
+                            # Right-hand Dex3 USD compensation:
+                            # - Index/Middle (positions 3..6): limits positive-only on right vs negative-only on
+                            #   left → simple negation flips them into range.
+                            # - Thumb1/Thumb2 (positions 1, 2): right limit ranges are the mirrored swap of left's.
+                            #   To map values into the right-hand range while preserving motion direction, shift by
+                            #   (right_joint_max − left_joint_max).
+                            #     thumb1: left max +1.05, right max +0.61, offset = -0.44
+                            #     thumb2: left max +1.75, right max  0.00, offset = -1.75
+                            # - Thumb0 (position 0): symmetric (−1.05, 1.05) limits but abduction direction is
+                            #   inverted in the right-hand USD frame, so negate.
+                            self._right_hand_buf[3:].neg_()
+                            self._right_hand_buf[0].neg_()
+                            self._right_hand_buf[1] -= 0.44
+                            self._right_hand_buf[2] -= 1.75
                             l_vals = self._left_hand_buf.index_select(0, self._left_hand_source_idx_t)
                             r_vals = self._right_hand_buf.index_select(0, self._right_hand_source_idx_t)
                             full_action.index_copy_(0, self._left_hand_target_idx_t, l_vals)
                             full_action.index_copy_(0, self._right_hand_target_idx_t, r_vals)
+                            self._dex3_apply_log_count = getattr(self, "_dex3_apply_log_count", 0) + 1
+                            if self._dex3_apply_log_count % 120 == 0:
+                                # Read back actual articulation state to compare commanded vs actual
+                                jp = self.env.scene["robot"].data.joint_pos[0]
+                                jpt = self.env.scene["robot"].data.joint_pos_target[0]
+                                jpl = self.env.scene["robot"].data.joint_pos_limits[0]
+                                l_actual = [round(jp[i].item(), 3) for i in self._left_hand_target_indices]
+                                r_actual = [round(jp[i].item(), 3) for i in self._right_hand_target_indices]
+                                l_target_state = [round(jpt[i].item(), 3) for i in self._left_hand_target_indices]
+                                r_target_state = [round(jpt[i].item(), 3) for i in self._right_hand_target_indices]
+                                l_limits = [(round(jpl[i, 0].item(), 2), round(jpl[i, 1].item(), 2)) for i in self._left_hand_target_indices]
+                                r_limits = [(round(jpl[i, 0].item(), 2), round(jpl[i, 1].item(), 2)) for i in self._right_hand_target_indices]
+                                print(f"[DEX3 APPLY] L_cmd={[round(v,3) for v in l_vals.tolist()]}", flush=True)
+                                print(f"[DEX3 APPLY] L_actual_jpos={l_actual}", flush=True)
+                                print(f"[DEX3 APPLY] L_jpos_target_state={l_target_state}", flush=True)
+                                print(f"[DEX3 APPLY] L_limits={l_limits}", flush=True)
+                                print(f"[DEX3 APPLY] R_cmd={[round(v,3) for v in r_vals.tolist()]}", flush=True)
+                                print(f"[DEX3 APPLY] R_actual_jpos={r_actual}", flush=True)
+                                print(f"[DEX3 APPLY] R_jpos_target_state={r_target_state}", flush=True)
+                                print(f"[DEX3 APPLY] R_limits={r_limits}", flush=True)
             elif self.brainco_dds:
                 hand_cmds = self.brainco_dds.get_hand_commands()
                 if hand_cmds:

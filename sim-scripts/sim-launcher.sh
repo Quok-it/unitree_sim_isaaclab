@@ -13,6 +13,12 @@ DOCKER_IMAGE="${DOCKER_IMAGE:-unitree-sim}"
 STARTUP_DELAY="${STARTUP_DELAY:-15}"
 SUDO="${SUDO:-}"
 
+# mode → task name. "Wholebody" in the task name is what flips sim_main.py
+# into dds_wholebody action mode; "Joint" tasks are arms-only with a fixed base.
+WHOLEBODY_TASK="Isaac-Move-Cylinder-G129-Dex3-Wholebody"
+ARMS_TASK="Isaac-PickPlace-Cylinder-G129-Dex3-Joint"
+DEFAULT_MODE="arms"
+
 mkdir -p "$LOG_DIR"
 
 have_session() { tmux has-session -t "$1" 2>/dev/null; }
@@ -48,7 +54,26 @@ kill_stale_containers() {
     fi
 }
 
+resolve_mode() {
+    case "$1" in
+        arms|arms-only)        SIM_TASK="$ARMS_TASK" ;;
+        wholebody|whole-body)  SIM_TASK="$WHOLEBODY_TASK" ;;
+        *) echo "ERROR: unknown mode '$1' (expected: arms | wholebody)" >&2; exit 1 ;;
+    esac
+    export SIM_TASK
+}
+
 start() {
+    local mode="$DEFAULT_MODE"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -m|--mode) mode="$2"; shift 2 ;;
+            arms|arms-only|wholebody|whole-body) mode="$1"; shift ;;
+            *) echo "ERROR: unknown start arg '$1'" >&2; exit 1 ;;
+        esac
+    done
+    resolve_mode "$mode"
+
     if have_session "$SIM_SESSION"; then
         echo "Already running. Run '$0 stop' first, or '$0 status' to inspect."
         exit 1
@@ -59,6 +84,7 @@ start() {
         exit 1
     fi
 
+    echo "Mode: $mode  →  task=$SIM_TASK"
     echo "[1/3] Cleaning up any stale '$DOCKER_IMAGE' containers..."
     kill_stale_containers
 
@@ -116,15 +142,17 @@ logs() {
 
 usage() {
     cat <<EOF
-Usage: $0 <command>
+Usage: $0 <command> [args]
 
 Commands:
-    start                       Launch sim in a detached tmux session
+    start [arms|wholebody]      Launch sim in a detached tmux session (default: $DEFAULT_MODE)
+                                  arms       → $ARMS_TASK
+                                  wholebody  → $WHOLEBODY_TASK
     stop                        Kill the sim tmux session and any stale containers
     status                      Print running state of sim + docker
     logs                        Tail the sim log file
-  clean                       Remove stale FastRTPS /dev/shm segments (needs sudo)
-  restart                     stop + start
+    clean                       Remove stale FastRTPS /dev/shm segments (needs sudo)
+    restart [arms|wholebody]    stop + start
 
 Env vars:
     STARTUP_DELAY=<sec>    delay before checking sim startup (default 15)
@@ -133,13 +161,15 @@ Env vars:
 EOF
 }
 
-case "${1:-}" in
-    start)   start ;;
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+    start)   start "$@" ;;
     stop)    stop ;;
     status)  status ;;
     logs)    logs ;;
     clean)   clean_stale_shm ;;
-    restart) stop; sleep 2; start ;;
+    restart) stop; sleep 2; start "$@" ;;
     -h|--help|help|"") usage ;;
-    *) echo "Unknown command: $1" >&2; usage; exit 1 ;;
+    *) echo "Unknown command: $cmd" >&2; usage; exit 1 ;;
 esac

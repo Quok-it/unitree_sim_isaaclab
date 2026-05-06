@@ -12,6 +12,8 @@ WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets Fa
                                 # shape mismatch because subscribers spin up before any publisher has
                                 # announced on the DDS bus)
 
+SIM_TASK="${SIM_TASK:-Isaac-PickPlace-Cylinder-G129-Dex3-Joint}"
+
 if [[ -z "${DISPLAY:-}" ]]; then
     echo "ERROR: DISPLAY is not set. Run this from a graphical session." >&2
     exit 1
@@ -34,6 +36,7 @@ exec $SUDO docker run --gpus all -it --rm --network host \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     -v "$SIM_DIR/assets:/home/code/unitree_sim_isaaclab/assets" \
     -v "$SIM_DIR/sim_main.py:/home/code/unitree_sim_isaaclab/sim_main.py:ro" \
+    -v "$SIM_DIR/action_provider:/home/code/unitree_sim_isaaclab/action_provider:ro" \
     "$DOCKER_IMAGE" \
     /bin/bash -c "
         source /opt/conda/etc/profile.d/conda.sh &&
@@ -44,7 +47,7 @@ exec $SUDO docker run --gpus all -it --rm --network host \
         python sim_main.py \
             --device cpu \
             --enable_cameras \
-            --task Isaac-PickPlace-Cylinder-G129-Dex3-Joint \
+            --task ${SIM_TASK} \
             --enable_dex3_dds \
             --robot_type g129 \
             --kit_args '--/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false'
