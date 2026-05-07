@@ -561,11 +561,11 @@ def main():
                     if reset_pose_cmd is not None:
                         try:
                             reset_category = reset_pose_cmd.get("reset_category")
-                            if (args_cli.enable_wholebody_dds and (reset_category == '1' or reset_category == '2')) or (not args_cli.enable_wholebody_dds and reset_category == '1'):
+                            if reset_category == '1':
                                 print("reset object")
                                 env_cfg.event_manager.trigger("reset_object_self", env)
                                 reset_pose_dds.write_reset_pose_command(-1)
-                            elif reset_category == '2' and not args_cli.enable_wholebody_dds:
+                            elif reset_category == '2':
                                 print("reset all")
                                 env_cfg.event_manager.trigger("reset_all_self", env)
                                 reset_pose_dds.write_reset_pose_command(-1)

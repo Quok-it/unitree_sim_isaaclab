@@ -432,8 +432,8 @@ class DDSRLActionProvider(ActionProvider):
                             # - Index/Middle (positions 3..6): limits positive-only on right vs negative-only on
                             #   left → simple negation flips them into range.
                             # - Thumb1/Thumb2 (positions 1, 2): right limit ranges are the mirrored swap of left's.
-                            #   To map values into the right-hand range while preserving motion direction, shift by
-                            #   (right_joint_max − left_joint_max).
+                            #   Shift by (right_joint_max − left_joint_max) to map values into range while
+                            #   preserving motion direction.
                             #     thumb1: left max +1.05, right max +0.61, offset = -0.44
                             #     thumb2: left max +1.75, right max  0.00, offset = -1.75
                             # - Thumb0 (position 0): symmetric (−1.05, 1.05) limits but abduction direction is
