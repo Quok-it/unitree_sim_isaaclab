@@ -5,7 +5,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SIM_DIR="${SIM_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# SIM_DIR resolution order:
+#   1. SIM_DIR env var (ad-hoc override — points at any repo path)
+#   2. WALDO_ISAAC_DIR env var (matches updater.ts convention)
+#   3. $HOME/unitree_sim_isaaclab (customer install layout per updater.ts:95)
+# This avoids deriving from $SCRIPT_DIR — when the script is `cp`'d to
+# /opt/waldo/bin/ by the updater, $SCRIPT_DIR/.. would resolve to /opt/waldo
+# which doesn't contain the repo content (sim_main.py, tasks/, etc.).
+SIM_DIR="${SIM_DIR:-${WALDO_ISAAC_DIR:-$HOME/unitree_sim_isaaclab}}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-unitree-sim}"
 SUDO="${SUDO:-}"               # export SUDO=sudo if your user isn't in the docker group
 WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets FastDDS discovery settle
