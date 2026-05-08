@@ -37,6 +37,9 @@ exec $SUDO docker run --gpus all -it --rm --network host \
     -v "$SIM_DIR/assets:/home/code/unitree_sim_isaaclab/assets" \
     -v "$SIM_DIR/sim_main.py:/home/code/unitree_sim_isaaclab/sim_main.py:ro" \
     -v "$SIM_DIR/action_provider:/home/code/unitree_sim_isaaclab/action_provider:ro" \
+    -v "$SIM_DIR/dds:/home/code/unitree_sim_isaaclab/dds:ro" \
+    -v "$SIM_DIR/tasks:/home/code/unitree_sim_isaaclab/tasks:ro" \
+    -v "$SIM_DIR/robots:/home/code/unitree_sim_isaaclab/robots:ro" \
     "$DOCKER_IMAGE" \
     /bin/bash -c "
         source /opt/conda/etc/profile.d/conda.sh &&
