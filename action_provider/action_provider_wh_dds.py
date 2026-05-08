@@ -428,20 +428,6 @@ class DDSRLActionProvider(ActionProvider):
                         if len(left_positions) >= len(self._left_hand_buf) and len(right_positions) >= len(self._right_hand_buf):
                             self._left_hand_buf.copy_(torch.tensor(left_positions[:len(self._left_hand_buf)], dtype=torch.float32, device=self.env.device))
                             self._right_hand_buf.copy_(torch.tensor(right_positions[:len(self._right_hand_buf)], dtype=torch.float32, device=self.env.device))
-                            # Right-hand Dex3 USD compensation:
-                            # - Index/Middle (positions 3..6): limits positive-only on right vs negative-only on
-                            #   left → simple negation flips them into range.
-                            # - Thumb1/Thumb2 (positions 1, 2): right limit ranges are the mirrored swap of left's.
-                            #   Shift by (right_joint_max − left_joint_max) to map values into range while
-                            #   preserving motion direction.
-                            #     thumb1: left max +1.05, right max +0.61, offset = -0.44
-                            #     thumb2: left max +1.75, right max  0.00, offset = -1.75
-                            # - Thumb0 (position 0): symmetric (−1.05, 1.05) limits but abduction direction is
-                            #   inverted in the right-hand USD frame, so negate.
-                            self._right_hand_buf[3:].neg_()
-                            self._right_hand_buf[0].neg_()
-                            self._right_hand_buf[1] -= 0.44
-                            self._right_hand_buf[2] -= 1.75
                             l_vals = self._left_hand_buf.index_select(0, self._left_hand_source_idx_t)
                             r_vals = self._right_hand_buf.index_select(0, self._right_hand_source_idx_t)
                             full_action.index_copy_(0, self._left_hand_target_idx_t, l_vals)
