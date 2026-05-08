@@ -4,7 +4,8 @@
 
 set -euo pipefail
 
-SIM_DIR="${SIM_DIR:-$HOME/unitree_sim_isaaclab}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SIM_DIR="${SIM_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-unitree-sim}"
 SUDO="${SUDO:-}"               # export SUDO=sudo if your user isn't in the docker group
 WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets FastDDS discovery settle
@@ -12,7 +13,8 @@ WARMUP_SECS="${WARMUP_SECS:-15}" # pre-python delay inside container — lets Fa
                                 # shape mismatch because subscribers spin up before any publisher has
                                 # announced on the DDS bus)
 
-SIM_TASK="${SIM_TASK:-Isaac-PickPlace-Cylinder-G129-Dex3-Joint}"
+SIM_TASK="${SIM_TASK:-Isaac-PickPlace-Cylinder-G129-BrainCo-Joint}"
+HAND_DDS_FLAG="${HAND_DDS_FLAG:---enable_brainco_dds}"  # one of: --enable_dex3_dds | --enable_brainco_dds | --enable_dex1_dds | --enable_inspire_dds
 
 if [[ -z "${DISPLAY:-}" ]]; then
     echo "ERROR: DISPLAY is not set. Run this from a graphical session." >&2
@@ -51,7 +53,7 @@ exec $SUDO docker run --gpus all -it --rm --network host \
             --device cpu \
             --enable_cameras \
             --task ${SIM_TASK} \
-            --enable_dex3_dds \
+            ${HAND_DDS_FLAG} \
             --robot_type g129 \
             --kit_args '--/app/renderer/waitIdle=false --/app/hydraEngine/waitIdle=false'
     "
