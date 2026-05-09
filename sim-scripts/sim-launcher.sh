@@ -117,7 +117,9 @@ start() {
 
     echo "[2/2] Starting sim in tmux session '$SIM_SESSION'..."
     : > "$LOG_DIR/sim.log"
-    tmux new-session -d -s "$SIM_SESSION" -x 220 -y 50 \
+    tmux new-session -d -s "$SIM_SESSION" \
+        -e "SIM_TASK=$SIM_TASK" -e "HAND_DDS_FLAG=$HAND_DDS_FLAG" \
+        -x 220 -y 50 \
         "bash '$SCRIPT_DIR/run-sim.sh' 2>&1 | tee -a '$LOG_DIR/sim.log'; echo '[run-sim.sh exited with '\$?']' >> '$LOG_DIR/sim.log'"
 
     echo "       Waiting ${STARTUP_DELAY}s for sim to come up..."
