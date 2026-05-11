@@ -1,190 +1,116 @@
-# sim-scripts!
+# sim-scripts
 
-Shell scripts for launching and managing the Unitree Isaac Lab simulation workflow.
+Shell scripts for launching and managing the Unitree Isaac Lab simulation.
 
-The default entrypoint is `sim-launcher.sh`, which orchestrates:
-1. `run-sim.sh` (Isaac sim in Docker)
+The entrypoint is `sim-launcher.sh`, which manages a detached tmux session running `run-sim.sh` (Isaac sim in Docker).
 
-If you also want teleop launched automatically, use `sim-launcher-teleop.sh`.
+## How it works
 
-## How It Works
-
-`sim-launcher.sh` is the sim-only orchestrator.
-
-On `start`, it:
+`sim-launcher.sh start`:
 1. Cleans up stale Docker containers for the configured image.
-2. Starts `run-sim.sh` in a detached tmux session (`unitree-sim`).
-3. Waits for a startup delay (default 15 seconds).
-4. Writes logs under `./logs/sim.log`.
+2. Resolves `--task` / `--hand` into a sim task ID + hand DDS flag.
+3. Starts `run-sim.sh` in a detached tmux session named `unitree-sim`.
+4. Waits `STARTUP_DELAY` seconds (default 15), then verifies the session is alive.
+5. Streams logs to `./logs/sim.log`.
 
-On `stop`, it:
-1. Kills sim tmux session.
-2. Kills leftover Docker containers from the configured image.
+`sim-launcher.sh stop` kills the tmux session and any leftover containers.
 
-It also supports `status`, `logs`, `restart`, and `clean` (stale DDS shared memory cleanup in `/dev/shm`).
-
-`sim-launcher-teleop.sh` is the combined workflow. It keeps the original behavior of starting teleop after sim comes up.
-
-## Scripts
-
-### `sim-launcher.sh` (sim-only orchestrator)
-- Manages the sim tmux session.
-- Handles startup sequence and delay.
-- Provides operational commands (`start/stop/status/logs/clean/restart`).
-- Detects and optionally removes stale DDS/FastRTPS shared memory files.
-
-### `sim-launcher-teleop.sh` (combined orchestrator)
-- Starts sim, waits, then starts teleop.
-- Manages both tmux sessions.
-- Uses the same cleanup and log behavior as the original launcher.
-
-### `run-sim.sh` (simulation)
-- Runs `unitree_sim_isaaclab` in Docker (`unitree-sim` image by default).
-- Requires a graphical session (`DISPLAY` must be set).
-- Mounts assets and `sim_main.py` into the container.
-- Activates `unitree_sim_env` and runs `python sim_main.py` with task/device flags.
-- Includes warmup delay (`WARMUP_SECS`, default 15s) before launching Python.
-
-### `run-teleop.sh` (teleoperation)
-- Runs `teleop_hand_and_arm.py` from local teleop source tree.
-- Finds a Conda installation and activates env `tv2` by default.
-- Starts teleop in simulation mode:
-	- `--ee=dex3`
-	- `--input-mode=waldo`
-	- `--sim`
-	- `--record`
+Other commands: `status`, `logs`, `restart`, `clean` (purges stale FastRTPS `/dev/shm` segments).
 
 ## Prerequisites
 
-- Linux host with GUI/X11 session (for Isaac rendering).
-- `bash`, `tmux`, `docker`, `xhost` installed.
-- NVIDIA GPU + NVIDIA container runtime available (`docker run --gpus all`).
-- Docker image available locally (default: `unitree-sim`).
-- Unitree sim repo present (default: `$HOME/unitree_sim_isaaclab`).
-- Teleop repo present (default: `$HOME/unitree_xr_teleoperate/teleop`).
-- Conda installed with required teleop environment (default env: `tv2`).
+- Linux host with X11 (`DISPLAY` set)
+- `bash`, `tmux`, `docker`, `xhost`
+- NVIDIA GPU + container runtime (`docker run --gpus all`)
+- `unitree-sim` Docker image built locally
 
-## Quick Start
-
-From this repo root:
+## Quick start
 
 ```bash
-chmod +x sim-launcher.sh sim-launcher-teleop.sh run-sim.sh run-teleop.sh
-./sim-launcher.sh start                # defaults to wholebody
-./sim-launcher.sh start arms           # arms-only (fixed base, Joint task)
-./sim-launcher.sh start wholebody      # explicit
-```
+chmod +x sim-launcher.sh run-sim.sh
 
-### Modes
-
-| Mode | Task | Behavior |
-|---|---|---|
-| `wholebody` (default) | `Isaac-Move-Cylinder-G129-Dex3-Wholebody` | Full-body control via `dds_wholebody` action mode |
-| `arms` (alias: `arms-only`) | `Isaac-PickPlace-Cylinder-G129-Dex3-Joint` | Arms-only joint control with fixed base |
-
-You can also pass the mode as a flag: `./sim-launcher.sh start -m arms`.
-
-> **Note:** `restart` with no mode arg falls back to the default (`wholebody`). Pass the mode explicitly (`./sim-launcher.sh restart arms`) to keep arms-only across a restart.
-
-To run the combined workflow instead:
-
-```bash
-./sim-launcher-teleop.sh start
-```
-
-Check status:
-
-```bash
+./sim-launcher.sh start                           # default: arms + brainco
+./sim-launcher.sh start --hand dex3               # arms + dex3
+./sim-launcher.sh start --task wholebody --hand dex3   # wholebody + dex3
 ./sim-launcher.sh status
-```
-
-Follow logs:
-
-```bash
-./sim-launcher.sh logs sim
-./sim-launcher.sh logs teleop
-./sim-launcher.sh logs both
-```
-
-Stop everything:
-
-```bash
+./sim-launcher.sh logs                            # tail -f logs/sim.log
 ./sim-launcher.sh stop
 ```
 
-## Command Reference
+## Launch flags
+
+The launcher takes two orthogonal flags. Defaults are `--task arms --hand brainco`.
+
+### `--task`
+
+| Value | Sim task | Behavior |
+|---|---|---|
+| `arms` *(default)* | `Isaac-PickPlace-Cylinder-G129-<hand>-Joint` | Fixed base, arms-only joint control |
+| `wholebody` | `Isaac-Move-Cylinder-G129-Dex3-Wholebody` | Locomotion + manipulation; auto-enables `dds_wholebody` action mode |
+
+### `--hand`
+
+| Value | DDS flag | Hand |
+|---|---|---|
+| `brainco` *(default)* | `--enable_brainco_dds` | BrainCo Revo 2 (6 actuated joints/hand, 5 mimic distals) |
+| `dex3` | `--enable_dex3_dds` | Unitree Dex3 |
+
+### Unsupported combination
+
+`--task wholebody --hand brainco` is rejected — the wholebody USD only ships with Dex3 hands.
+
+## Command reference
 
 ```bash
-./sim-launcher.sh start [arms|wholebody]      # default: wholebody
+./sim-launcher.sh start [--task <t>] [--hand <h>]
+./sim-launcher.sh restart [--task <t>] [--hand <h>]
 ./sim-launcher.sh stop
 ./sim-launcher.sh status
 ./sim-launcher.sh logs
-./sim-launcher.sh clean
-./sim-launcher.sh restart [arms|wholebody]    # default: wholebody (does not remember prior mode)
+./sim-launcher.sh clean      # remove stale /dev/shm DDS segments (sudo)
 ```
 
-## Environment Variables
+`restart` does not remember the previous flags — pass them again to keep the same config.
 
-Set these before launching if your setup differs from defaults.
+## Environment variables
 
 ### Orchestrator (`sim-launcher.sh`)
-- `STARTUP_DELAY` (default `15`): delay before the sim startup check.
-- `DOCKER_IMAGE` (default `unitree-sim`): image used to detect/kill stale containers.
-- `SUDO` (default empty): set to `sudo` if Docker requires elevated privileges.
 
-### Combined orchestrator (`sim-launcher-teleop.sh`)
-- `STARTUP_DELAY` (default `15`): delay between sim and teleop launch.
-- `DOCKER_IMAGE` (default `unitree-sim`): image used to detect/kill stale containers.
-- `SUDO` (default empty): set to `sudo` if Docker requires elevated privileges.
+| Var | Default | Effect |
+|---|---|---|
+| `STARTUP_DELAY` | `15` | Seconds to wait after launch before verifying tmux session is alive |
+| `DOCKER_IMAGE` | `unitree-sim` | Image name used to detect/kill stale containers |
+| `SUDO` | (empty) | Set to `sudo` if your user isn't in the docker group |
 
-### Simulation (`run-sim.sh`)
-- `SIM_DIR` (default `$HOME/unitree_sim_isaaclab`): local sim workspace.
-- `DOCKER_IMAGE` (default `unitree-sim`): Docker image to run.
-- `SUDO` (default empty): prefix Docker commands.
-- `WARMUP_SECS` (default `15`): delay before starting `sim_main.py`.
+### Sim (`run-sim.sh`)
 
-### Teleop (`run-teleop.sh`)
-- `TELEOP_DIR` (default `$HOME/unitree_xr_teleoperate/teleop`): teleop source directory.
-- `CONDA_ENV` (default `tv2`): Conda env used for teleop.
+| Var | Default | Effect |
+|---|---|---|
+| `SIM_DIR` | repo root (auto-detected from script location) | Source dir for bind-mounted code/assets |
+| `DOCKER_IMAGE` | `unitree-sim` | Image to run |
+| `SUDO` | (empty) | Prefix for `docker run` |
+| `WARMUP_SECS` | `15` | In-container delay before `python sim_main.py` (lets FastDDS discovery settle) |
+| `SIM_TASK` | (set by launcher, else `Isaac-PickPlace-Cylinder-G129-BrainCo-Joint`) | Task ID |
+| `HAND_DDS_FLAG` | (set by launcher, else `--enable_brainco_dds`) | Hand DDS arg passed to `sim_main.py` |
 
-Example:
+`run-sim.sh` is standalone-runnable; the launcher is just a tmux + lifecycle wrapper.
 
-```bash
-export SIM_DIR=$HOME/unitree_sim_isaaclab
-export TELEOP_DIR=$HOME/unitree_xr_teleoperate/teleop
-export CONDA_ENV=tv2
-export DOCKER_IMAGE=unitree-sim
-export SUDO=sudo
-./sim-launcher.sh start
-```
+## Operational notes
 
-## Operational Notes
-
-- tmux sessions used by default:
-- `sim-launcher.sh`: `unitree-sim`
-- `sim-launcher-teleop.sh`: `unitree-sim`, `unitree-teleop`
-- Attach live:
-
-```bash
-tmux attach -t unitree-sim
-tmux attach -t unitree-teleop
-```
-
-- Log files are written to `./logs` in this repo.
+- tmux session: `unitree-sim`. Attach live with `tmux attach -t unitree-sim`.
+- Logs at `./logs/sim.log`.
+- Bind mounts (host → container): `assets/`, `sim_main.py`, `action_provider/`, `dds/`, `tasks/`, `robots/` — so most code edits on the host take effect on the next launch without rebuilding the image.
 
 ## Troubleshooting
 
-- `DISPLAY is not set`:
-- Run from a graphical shell session.
+**`DISPLAY is not set`** — run from a graphical shell.
 
-- Sim or teleop directory not found:
-- Set `SIM_DIR` / `TELEOP_DIR` to correct paths.
+**`USD file not found`** — verify the asset exists under `$SIM_DIR/assets/...`. By default `SIM_DIR` is the parent of `sim-scripts/`, so it follows wherever you cloned the repo.
 
-- `conda not found` in teleop:
-- Ensure Conda is installed in a standard location or update `run-teleop.sh` search paths.
+**`unrecognized arguments: --enable_brainco_dds`** — the container is running the baked image's `sim_main.py`, not your host copy. Check `mount | grep sim_main` inside the container; if missing, the bind mount didn't apply.
 
-- DDS/FastRTPS shared memory issues:
-- Run `./sim-launcher.sh clean` to remove stale `/dev/shm` segments.
+**Hands don't move in sim** — DDS publisher (XR teleop, `send_commands_*.py`, etc.) isn't running, or domain ID mismatches between publisher and subscriber. Sniff `rt/brainco/{left,right}/cmd` (or `rt/dex3/...`) to confirm messages are on the bus.
 
-- Already running warning on start:
-- Use `./sim-launcher.sh status` and `./sim-launcher.sh stop` first.
+**Stale DDS segments warning** — `./sim-launcher.sh clean` (needs sudo). Frequent crashes can leave hundreds of `/dev/shm/fastrtps_*` files that cause subtle DDS init errors.
+
+**`Already running` on start** — `./sim-launcher.sh status` to inspect, then `stop` first.

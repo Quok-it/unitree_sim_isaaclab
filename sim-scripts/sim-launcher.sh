@@ -13,11 +13,15 @@ DOCKER_IMAGE="${DOCKER_IMAGE:-unitree-sim}"
 STARTUP_DELAY="${STARTUP_DELAY:-15}"
 SUDO="${SUDO:-}"
 
-# mode → task name. "Wholebody" in the task name is what flips sim_main.py
-# into dds_wholebody action mode; "Joint" tasks are arms-only with a fixed base.
-WHOLEBODY_TASK="Isaac-Move-Cylinder-G129-Dex3-Wholebody"
-ARMS_TASK="Isaac-PickPlace-Cylinder-G129-Dex3-Joint"
-DEFAULT_MODE="arms"
+# Two-axis launch config:
+#   --task arms       → fixed-base manipulation (PickPlace-Cylinder ... Joint task)
+#   --task wholebody  → locomotion + manipulation; "Wholebody" in the task name is what
+#                       flips sim_main.py into dds_wholebody action mode
+#   --hand dex3       → Unitree Dex3 hand (--enable_dex3_dds)
+#   --hand brainco    → BrainCo Revo 2 hand (--enable_brainco_dds)
+# Wholebody currently only ships with Dex3 hands; wholebody + brainco is rejected.
+DEFAULT_TASK="arms"
+DEFAULT_HAND="brainco"
 
 mkdir -p "$LOG_DIR"
 
@@ -54,25 +58,41 @@ kill_stale_containers() {
     fi
 }
 
-resolve_mode() {
-    case "$1" in
-        arms|arms-only)        SIM_TASK="$ARMS_TASK" ;;
-        wholebody|whole-body)  SIM_TASK="$WHOLEBODY_TASK" ;;
-        *) echo "ERROR: unknown mode '$1' (expected: arms | wholebody)" >&2; exit 1 ;;
+resolve_config() {
+    local task="$1" hand="$2"
+
+    if [[ "$task" == "wholebody" && "$hand" == "brainco" ]]; then
+        echo "ERROR: wholebody + brainco isn't supported — no wholebody USD has brainco hands." >&2
+        exit 1
+    fi
+
+    case "$hand" in
+        dex3)    HAND_DDS_FLAG="--enable_dex3_dds"    ; hand_token="Dex3"    ;;
+        brainco) HAND_DDS_FLAG="--enable_brainco_dds" ; hand_token="BrainCo" ;;
+        *) echo "ERROR: --hand must be dex3|brainco (got '$hand')" >&2; exit 1 ;;
     esac
-    export SIM_TASK
+
+    case "$task" in
+        arms)      SIM_TASK="Isaac-PickPlace-Cylinder-G129-${hand_token}-Joint" ;;
+        wholebody) SIM_TASK="Isaac-Move-Cylinder-G129-Dex3-Wholebody" ;;
+        *) echo "ERROR: --task must be arms|wholebody (got '$task')" >&2; exit 1 ;;
+    esac
+
+    export SIM_TASK HAND_DDS_FLAG
 }
 
 start() {
-    local mode="$DEFAULT_MODE"
+    local task="$DEFAULT_TASK" hand="$DEFAULT_HAND"
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -m|--mode) mode="$2"; shift 2 ;;
-            arms|arms-only|wholebody|whole-body) mode="$1"; shift ;;
+            --task)    task="$2"; shift 2 ;;
+            --task=*)  task="${1#--task=}"; shift ;;
+            --hand)    hand="$2"; shift 2 ;;
+            --hand=*)  hand="${1#--hand=}"; shift ;;
             *) echo "ERROR: unknown start arg '$1'" >&2; exit 1 ;;
         esac
     done
-    resolve_mode "$mode"
+    resolve_config "$task" "$hand"
 
     if have_session "$SIM_SESSION"; then
         echo "Already running. Run '$0 stop' first, or '$0 status' to inspect."
@@ -84,7 +104,7 @@ start() {
         exit 1
     fi
 
-    echo "Mode: $mode  →  task=$SIM_TASK"
+    echo "Config: task=$task  hand=$hand  →  $SIM_TASK $HAND_DDS_FLAG"
     echo "[1/3] Cleaning up any stale '$DOCKER_IMAGE' containers..."
     kill_stale_containers
 
@@ -97,7 +117,9 @@ start() {
 
     echo "[2/2] Starting sim in tmux session '$SIM_SESSION'..."
     : > "$LOG_DIR/sim.log"
-    tmux new-session -d -s "$SIM_SESSION" -x 220 -y 50 \
+    tmux new-session -d -s "$SIM_SESSION" \
+        -e "SIM_TASK=$SIM_TASK" -e "HAND_DDS_FLAG=$HAND_DDS_FLAG" \
+        -x 220 -y 50 \
         "bash '$SCRIPT_DIR/run-sim.sh' 2>&1 | tee -a '$LOG_DIR/sim.log'; echo '[run-sim.sh exited with '\$?']' >> '$LOG_DIR/sim.log'"
 
     echo "       Waiting ${STARTUP_DELAY}s for sim to come up..."
@@ -145,14 +167,20 @@ usage() {
 Usage: $0 <command> [args]
 
 Commands:
-    start [arms|wholebody]      Launch sim in a detached tmux session (default: $DEFAULT_MODE)
-                                  arms       → $ARMS_TASK
-                                  wholebody  → $WHOLEBODY_TASK
+    start [--task <t>] [--hand <h>]
+                                Launch sim in a detached tmux session.
+                                  --task arms       (default) PickPlace-Cylinder, fixed base
+                                  --task wholebody  Move-Cylinder, locomotion + manipulation
+                                  --hand dex3       Unitree Dex3 hand
+                                  --hand brainco    (default) BrainCo Revo 2 hand
+                                Defaults: --task $DEFAULT_TASK --hand $DEFAULT_HAND
+                                Note: wholebody + brainco is not supported.
     stop                        Kill the sim tmux session and any stale containers
     status                      Print running state of sim + docker
     logs                        Tail the sim log file
     clean                       Remove stale FastRTPS /dev/shm segments (needs sudo)
-    restart [arms|wholebody]    stop + start
+    restart [--task <t>] [--hand <h>]
+                                stop + start
 
 Env vars:
     STARTUP_DELAY=<sec>    delay before checking sim startup (default 15)
