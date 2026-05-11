@@ -1434,9 +1434,9 @@ G129_CFG_WITH_BRAINCO_HAND = ArticulationCfg(
             ],
             effort_limit=100.0,
             velocity_limit=50,
-            stiffness={".*": 1000.0},
+            stiffness={".*": 100.0},
             damping={".*": 15.0},
-            armature={".*": 0.0},
+            armature={".*": 0.1},
         ),
     },
 )
