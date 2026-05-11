@@ -139,6 +139,8 @@ class PickPlaceG129BrainCoBaseFixEnvCfg(ManagerBasedRLEnvCfg):
         # general settings
         self.decimation = 2
         self.episode_length_s = 20.0
+        # nudge cylinder spawn left a few cm (base scene puts it at x=-0.35)
+        self.scene.object.init_state.pos = (-0.40, 0.40, 0.84)
         # simulation settings
         self.sim.dt = 0.005
         self.sim.render_interval = self.decimation
