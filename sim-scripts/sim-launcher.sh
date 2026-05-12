@@ -19,7 +19,8 @@ SUDO="${SUDO:-}"
 #                       flips sim_main.py into dds_wholebody action mode
 #   --hand dex3       → Unitree Dex3 hand (--enable_dex3_dds)
 #   --hand brainco    → BrainCo Revo 2 hand (--enable_brainco_dds)
-# Wholebody currently only ships with Dex3 hands; wholebody + brainco is rejected.
+#   --hand inspire    → Inspire hand (--enable_inspire_dds)
+# Wholebody ships with Dex3 and Inspire hands; wholebody + brainco is rejected.
 DEFAULT_TASK="arms"
 DEFAULT_HAND="brainco"
 
@@ -69,12 +70,13 @@ resolve_config() {
     case "$hand" in
         dex3)    HAND_DDS_FLAG="--enable_dex3_dds"    ; hand_token="Dex3"    ;;
         brainco) HAND_DDS_FLAG="--enable_brainco_dds" ; hand_token="BrainCo" ;;
-        *) echo "ERROR: --hand must be dex3|brainco (got '$hand')" >&2; exit 1 ;;
+        inspire) HAND_DDS_FLAG="--enable_inspire_dds" ; hand_token="Inspire" ;;
+        *) echo "ERROR: --hand must be dex3|brainco|inspire (got '$hand')" >&2; exit 1 ;;
     esac
 
     case "$task" in
         arms)      SIM_TASK="Isaac-PickPlace-Cylinder-G129-${hand_token}-Joint" ;;
-        wholebody) SIM_TASK="Isaac-Move-Cylinder-G129-Dex3-Wholebody" ;;
+        wholebody) SIM_TASK="Isaac-Move-Cylinder-G129-${hand_token}-Wholebody" ;;
         *) echo "ERROR: --task must be arms|wholebody (got '$task')" >&2; exit 1 ;;
     esac
 
@@ -173,6 +175,7 @@ Commands:
                                   --task wholebody  Move-Cylinder, locomotion + manipulation
                                   --hand dex3       Unitree Dex3 hand
                                   --hand brainco    (default) BrainCo Revo 2 hand
+                                  --hand inspire    Inspire hand
                                 Defaults: --task $DEFAULT_TASK --hand $DEFAULT_HAND
                                 Note: wholebody + brainco is not supported.
     stop                        Kill the sim tmux session and any stale containers
